@@ -183,7 +183,23 @@ var ClickTypeChance = map[ClickType]float64{
 	ClickNormal:    0.75, // 75% (остаток)
 }
 
+func resetProgressDaily() {
+	go func() {
+		for {
+			now := time.Now()
+			// Следующий полночь
+			next := now.Add(24 * time.Hour).Truncate(24 * time.Hour)
+			time.Sleep(time.Until(next))
+			hub.lock.Lock()
+			hub.count = 0
+			hub.lock.Unlock()
+			hub.broadcastCount()
+		}
+	}()
+}
+
 func main() {
+	resetProgressDaily()
 	http.HandleFunc("/ws", wsHandler)
 	log.Println("Listening on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
