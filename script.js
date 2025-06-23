@@ -232,16 +232,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
     img.addEventListener('click', function() { 
         animateImg();
-        // Генерируем значение и тип клика на фронте, но отображаем только по данным с сервера
-        let value = clickTypeRange.normal[0];
-        const r = Math.random();
-        if (r < 0.05) {
-            const [min, max] = clickTypeRange.legendary;
-            value = min + Math.floor(Math.random() * (max - min + 1));
-        } else if (r < 0.25) {
-            const [min, max] = clickTypeRange.crit;
-            value = min + Math.floor(Math.random() * (max - min + 1));
-        }
-        ws.sendClick(value);
+        // Отправляем только action: 'click', сервер сам генерирует тип и значение
+        ws.sendClick();
     });
 });
