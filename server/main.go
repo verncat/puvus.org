@@ -25,7 +25,7 @@ type Hub struct {
 var hub = Hub{
 	clients:   make(map[*Client]bool),
 	lastClick: make(map[string]int64),
-	goal:      100, // Цель по умолчанию
+	goal:      10000, // Цель по умолчанию
 }
 
 var upgrader = websocket.Upgrader{
