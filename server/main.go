@@ -25,7 +25,7 @@ type Hub struct {
 var hub = Hub{
 	clients:   make(map[*Client]bool),
 	lastClick: make(map[string]int64),
-	goal:      1000, // Цель по умолчанию
+	goal:      100, // Цель по умолчанию
 }
 
 var upgrader = websocket.Upgrader{
@@ -35,8 +35,18 @@ var upgrader = websocket.Upgrader{
 func (h *Hub) broadcastCount() {
 	h.lock.Lock()
 	defer h.lock.Unlock()
+	// Формируем маппинг для фронта
+	typeRange := map[string][2]int{}
+	for k, v := range ClickTypeRange {
+		typeRange[string(k)] = v
+	}
 	for c := range h.clients {
-		err := c.conn.WriteJSON(map[string]interface{}{"count": h.count, "goal": h.goal})
+		err := c.conn.WriteJSON(map[string]interface{}{
+			"count":  h.count,
+			"goal":   h.goal,
+			"online": len(h.clients),
+			"clickTypeRange": typeRange,
+		})
 		if err != nil {
 			c.conn.Close()
 			delete(h.clients, c)
@@ -55,17 +65,24 @@ func getIP(r *http.Request) string {
 	return ip
 }
 
-func (h *Hub) handleClick(ip string, add int) bool {
+func (h *Hub) handleClick(ip string, add int) (bool, ClickType) {
 	now := time.Now().UnixNano()
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	last, ok := h.lastClick[ip]
 	if !ok || float64(now-last) >= 3e8 {
+		var clickType ClickType = ClickNormal
+		switch {
+		case add >= ClickTypeRange[ClickLegendary][0]:
+			clickType = ClickLegendary
+		case add >= ClickTypeRange[ClickCrit][0]:
+			clickType = ClickCrit
+		}
 		h.count += add
 		h.lastClick[ip] = now
-		return true
+		return true, clickType
 	}
-	return false
+	return false, ClickNormal
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +94,16 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	hub.lock.Lock()
 	hub.clients[client] = true
 	hub.lock.Unlock()
+	hub.broadcastCount() // обновить онлайн сразу
 	defer func() {
 		hub.lock.Lock()
 		delete(hub.clients, client)
 		hub.lock.Unlock()
+		hub.broadcastCount() // обновить онлайн после выхода
 		conn.Close()
 	}()
 	// send initial count and goal
-	client.conn.WriteJSON(map[string]interface{}{"count": hub.count, "goal": hub.goal})
+	client.conn.WriteJSON(map[string]interface{}{"count": hub.count, "goal": hub.goal, "online": len(hub.clients)})
 	for {
 		var msg map[string]interface{}
 		err := conn.ReadJSON(&msg)
@@ -97,11 +116,47 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 				add = int(v)
 			}
 			ip := getIP(r)
-			if hub.handleClick(ip, add) {
-				hub.broadcastCount()
+			if ok, clickType := hub.handleClick(ip, add); ok {
+				for c := range hub.clients {
+					err := c.conn.WriteJSON(map[string]interface{}{
+						"count":  hub.count,
+						"goal":   hub.goal,
+						"online": len(hub.clients),
+						"clickType": string(clickType),
+						"clickValue": add,
+					})
+					if err != nil {
+						c.conn.Close()
+						delete(hub.clients, c)
+					}
+				}
 			}
+		} else if msg["action"] == "ping" {
+			// просто ответить pong
+			conn.WriteJSON(map[string]interface{}{"pong": true, "online": len(hub.clients)})
+			continue
 		}
 	}
+}
+
+type ClickType string
+
+const (
+	ClickNormal    ClickType = "normal"
+	ClickCrit      ClickType = "crit"
+	ClickLegendary ClickType = "legendary"
+)
+
+var ClickTypeRange = map[ClickType][2]int{
+	ClickNormal:    {1, 1},
+	ClickCrit:      {5, 10},
+	ClickLegendary: {150, 200},
+}
+
+var ClickTypeChance = map[ClickType]float64{
+	ClickLegendary: 0.05, // 5%
+	ClickCrit:      0.20, // 20%
+	ClickNormal:    0.75, // 75% (остаток)
 }
 
 func main() {

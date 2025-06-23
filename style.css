@@ -208,3 +208,22 @@ footer a:visited {
     border-color: #ffb300;
   }
 }
+
+.container .floating-count.legendary {
+  background: linear-gradient(90deg, #ffea00, #ff00ea, #00eaff, #ffea00 70%);
+  background-size: 400% 400%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+  animation: float-count 0.9s cubic-bezier(.2,1.5,.5,1) forwards, legendary-glow 1.2s linear;
+  font-size: 2.8em !important;
+  font-weight: 900;
+  filter: drop-shadow(0 0 16px #fff) drop-shadow(0 0 32px #ffea00);
+}
+
+@keyframes legendary-glow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
