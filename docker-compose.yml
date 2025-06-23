@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  go-server:
+    build:
+      context: ./server
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:z
+      - ./:/srv:z
+    depends_on:
+      - go-server
