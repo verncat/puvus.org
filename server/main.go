@@ -65,24 +65,52 @@ func getIP(r *http.Request) string {
 	return ip
 }
 
-func (h *Hub) handleClick(ip string, add int) (bool, ClickType) {
+func (h *Hub) handleClick(ip string) (bool, ClickType, int) {
 	now := time.Now().UnixNano()
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	last, ok := h.lastClick[ip]
 	if !ok || float64(now-last) >= 3e8 {
-		var clickType ClickType = ClickNormal
-		switch {
-		case add >= ClickTypeRange[ClickLegendary][0]:
-			clickType = ClickLegendary
-		case add >= ClickTypeRange[ClickCrit][0]:
-			clickType = ClickCrit
-		}
+		// Генерируем тип клика и значение на сервере
+		clickType := getRandomClickType()
+		add := getClickValue(clickType)
 		h.count += add
 		h.lastClick[ip] = now
-		return true, clickType
+		return true, clickType, add
 	}
-	return false, ClickNormal
+	return false, ClickNormal, 0
+}
+
+// Генерация типа клика по вероятностям
+func getRandomClickType() ClickType {
+	r := randFloat()
+	acc := 0.0
+	for t, chance := range ClickTypeChance {
+		acc += chance
+		if r < acc {
+			return t
+		}
+	}
+	return ClickNormal
+}
+
+// Получить значение клика по типу
+func getClickValue(t ClickType) int {
+	rangeVals := ClickTypeRange[t]
+	if rangeVals[0] == rangeVals[1] {
+		return rangeVals[0]
+	}
+	return rangeVals[0] + randInt(rangeVals[1]-rangeVals[0]+1)
+}
+
+// randFloat возвращает float64 от 0 до 1
+func randFloat() float64 {
+	return float64(time.Now().UnixNano()%1e9) / 1e9
+}
+
+// randInt возвращает случайное int от 0 до n-1
+func randInt(n int) int {
+	return int(time.Now().UnixNano()%int64(n))
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
@@ -111,12 +139,8 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if msg["action"] == "click" {
-			add := 1
-			if v, ok := msg["count"].(float64); ok && v > 1 {
-				add = int(v)
-			}
 			ip := getIP(r)
-			if ok, clickType := hub.handleClick(ip, add); ok {
+			if ok, clickType, add := hub.handleClick(ip); ok {
 				for c := range hub.clients {
 					err := c.conn.WriteJSON(map[string]interface{}{
 						"count":  hub.count,

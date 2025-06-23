@@ -216,6 +216,15 @@ document.addEventListener('DOMContentLoaded', function(){
         goalBar.setGoal(goal);
         goalBar.setCount(count);
         if (extra && extra.online !== undefined) setOnline(extra.online);
+        // Меняем картинку при достижении цели
+        if (img) {
+            if (count >= goal && goal > 0) {
+                img.src = '';
+            } else {
+                img.src = 'img/ffxiv.png';
+
+            }
+        }
         // Показываем анимацию только если есть clickType и clickValue
         if (extra && extra.clickType && extra.clickValue > 0) {
             floating.show(extra.clickValue, extra.clickType);
