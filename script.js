@@ -124,12 +124,25 @@ document.addEventListener('DOMContentLoaded', function(){
         setTimeout(() => { img.style.filter = ''; }, 320);
     };
 
+    // Скрываем прогрессбар до ws, но сразу обновляем его (будет пустой)
+    goalBar.setGoal(0);
+    goalBar.setCount(0);
+    const goalBarContainer = document.querySelector('.goal-bar');
+    if (goalBarContainer) goalBarContainer.style.visibility = 'hidden';
+
     const ws = new ClickerWS((count, goal, diff) => {
+        if (goalBarContainer) goalBarContainer.style.visibility = 'visible';
         goalBar.setGoal(goal);
         goalBar.setCount(count);
+        // Обновлять всегда, даже если diff == 0
         if (diff > 0) {
-            floating.show(diff, diff > 1);
+            const isCrit = diff > 1;
+            floating.show(diff, isCrit);
             animateImg();
+            if (isCrit && goalBarContainer) {
+                goalBarContainer.classList.add('goal-bar-crit');
+                setTimeout(() => goalBarContainer.classList.remove('goal-bar-crit'), 600);
+            }
         }
     });
 
