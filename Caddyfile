@@ -1,0 +1,5 @@
+:80 {
+  root * /srv
+  file_server
+  reverse_proxy /ws go-server:8080
+}
